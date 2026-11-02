@@ -1,0 +1,26 @@
+name: Offline checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Verify preinstalled runtimes
+        run: |
+          node --version
+          python3 --version
+          node -e 'if (Number(process.versions.node.split(".")[0]) < 20) process.exit(1)'
+          python3 -I -c 'import sys; sys.exit(sys.version_info < (3, 9))'
+      - name: Synthetic offline suite
+        run: bash scripts/test.sh

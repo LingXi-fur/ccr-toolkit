@@ -1,0 +1,8 @@
+{
+  "providers": ["example-provider"],
+  "transforms": ["strip-tool-images", "fix-partial-tool-rounds"],
+  "placeholder": "[image omitted]",
+  "binaryPlaceholder": "[{type} omitted{details}]",
+  "maxInlinePayloadBytes": 65536,
+  "maxTextPayloadBytes": 131072
+}
