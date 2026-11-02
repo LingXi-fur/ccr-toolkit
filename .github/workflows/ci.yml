@@ -24,3 +24,5 @@ jobs:
           python3 -I -c 'import sys; sys.exit(sys.version_info < (3, 9))'
       - name: Synthetic offline suite
         run: bash scripts/test.sh
+      - name: Committed release-content gate
+        run: python3 -I scripts/check_public_content.py --head

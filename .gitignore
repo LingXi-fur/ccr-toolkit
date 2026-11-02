@@ -19,4 +19,5 @@ requests/
 __pycache__/
 *.py[cod]
 node_modules/
+.claude/
 .DS_Store

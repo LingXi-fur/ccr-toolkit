@@ -80,7 +80,7 @@ class DoctorTests(unittest.TestCase):
     def test_wrapper_is_parsed_not_executed(self):
         sentinel = self.home / 'executed'
         self.wrapper.write_text(f"touch '{sentinel}'\nexport CLAUDE_CODE_AUTO_COMPACT_WINDOW='100000'\n")
-        self.assertEqual(self.run_doctor().returncode, 0)
+        self.assertEqual(self.run_doctor().returncode, 1)
         self.assertFalse(sentinel.exists())
 
     def test_duplicate_profile_fails(self):
@@ -253,6 +253,40 @@ class DoctorTests(unittest.TestCase):
             reply.body = body
             with patch.object(mod.urllib.request, 'build_opener', return_value=Opener()):
                 self.assertFalse(mod.health(4000, 'running'))
+
+    def test_wrapper_multiline_condition_refused(self):
+        self.wrapper.write_text("if false; then\nexport CLAUDE_CODE_AUTO_COMPACT_WINDOW=100000\nfi\n")
+        run = self.run_doctor()
+        self.assertEqual(run.returncode, 1)
+        self.assertIn('FAIL env-drift', run.stdout)
+
+    def test_wrapper_heredoc_export_refused(self):
+        self.wrapper.write_text("cat <<'END'\nexport CLAUDE_CODE_AUTO_COMPACT_WINDOW=100000\nEND\n")
+        run = self.run_doctor()
+        self.assertEqual(run.returncode, 1)
+        self.assertIn('FAIL env-drift', run.stdout)
+
+    def test_wrapper_nonliteral_shell_refused(self):
+        for source in [
+            'false && \\\nexport CLAUDE_CODE_AUTO_COMPACT_WINDOW=100000\n',
+            'f() {\nexport CLAUDE_CODE_AUTO_COMPACT_WINDOW=100000\n}\n',
+            '(\nexport CLAUDE_CODE_AUTO_COMPACT_WINDOW=100000\n)\n',
+            'exit 0\nexport CLAUDE_CODE_AUTO_COMPACT_WINDOW=100000\n',
+        ]:
+            with self.subTest(source=source):
+                self.wrapper.write_text(source)
+                self.assertEqual(self.run_doctor().returncode, 1)
+
+    def test_wrapper_static_comments_and_literal_export_supported(self):
+        self.wrapper.write_text("#!/bin/bash\n# static fields only\n\nexport CLAUDE_CODE_AUTO_COMPACT_WINDOW=100000\n")
+        self.assertEqual(self.run_doctor().returncode, 0)
+
+    def test_wrapper_non_shell_whitespace_refused(self):
+        for whitespace in ['\v', '\r', ' ', '\f']:
+            for middle in [whitespace, whitespace + '# looks like a comment']:
+                with self.subTest(middle=ascii(middle)):
+                    self.wrapper.write_bytes(("#!/bin/bash -e\n" + middle + '\nexport CLAUDE_CODE_AUTO_COMPACT_WINDOW=100000\n').encode())
+                    self.assertEqual(self.run_doctor().returncode, 1)
 
     def test_help_does_not_require_real_home(self):
         run = self.run_doctor('--help')

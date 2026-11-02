@@ -149,14 +149,15 @@ def profile_environment(config):
 def wrapper_environment(path):
     source = bounded_file(path, MAX_TEXT).decode('utf-8')
     values = {}
-    for line in source.splitlines():
-        for key in ENV_FIELDS:
-            if key not in line or line.lstrip().startswith('#'):
-                continue
-            match = re.fullmatch(r'\s*export\s+' + key + r'=(?:"([0-9]{1,12})"|\'([0-9]{1,12})\'|([0-9]{1,12}))\s*', line)
-            if not match or key in values:
-                raise InputError()
-            values[key] = next(g for g in match.groups() if g is not None)
+    # This is a literal export file, not a shell parser. Even unrelated commands
+    # can change control flow, so unsupported lines invalidate the whole check.
+    for line in source.split('\n'):
+        if not line.strip(' \t') or line.lstrip(' \t').startswith('#'):
+            continue
+        match = re.fullmatch(r'[ \t]*export[ \t]+(' + '|'.join(ENV_FIELDS) + r')=(?:"([0-9]{1,12})"|\'([0-9]{1,12})\'|([0-9]{1,12}))[ \t]*', line)
+        if not match or match[1] in values:
+            raise InputError()
+        values[match[1]] = next(g for g in match.groups()[1:] if g is not None)
     return values
 
 

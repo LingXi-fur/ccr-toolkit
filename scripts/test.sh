@@ -8,6 +8,7 @@ bash -n bin/ccr-doctor.sh scripts/test.sh
 node --check plugins/tool-result-compat/index.mjs
 "$PYTHON" -I -c 'import ast; from pathlib import Path; [ast.parse(p.read_text(), filename=str(p)) for d in ("scripts", "tests") for p in Path(d).glob("*.py")]; print("Python syntax: PASS")'
 node --test --test-reporter=tap tests/plugin.test.mjs
+# Includes temporary local Git repositories; no fetch, remote helper, or server.
 for suite in tests/test_doctor.py tests/test_public_content.py; do
   "$PYTHON" -I "$suite"
 done

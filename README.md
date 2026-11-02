@@ -40,7 +40,7 @@ bash scripts/test.sh
 
 The suite uses synthetic messages and temporary configurations/databases. **No network, model calls, production configuration changes, or service restarts.**
 
-The initial candidate passed **58/58 local tests**: 27 plugin, 26 doctor, and 5 content-scanner tests. GitHub CI runs the offline suite on Linux; the badge links to current results. See [verification details](docs/verification.md).
+The initial candidate passed **58/58 local tests**. The current hardening pass has **80/80**: 27 plugin, 31 doctor, and 22 content-scanner tests. These local results do not establish remote CI success for this revision; check the matching commit's Actions run. The badge links to the published branch. See [verification details](docs/verification.md).
 
 ### What's inside?
 
@@ -80,7 +80,7 @@ Without path options, doctor uses the current user's `.claude-code-router` and `
 - `CLAUDE_CODE_MAX_CONTEXT_TOKENS`
 - `DISABLE_AUTOUPDATER`
 
-It parses the wrapper; **it never executes it**. Dynamic expressions and unsupported formats fail rather than silently count as a match. Exit codes: `0` PASS/WARN, `1` FAIL or WARN under `--strict`, `2` invalid arguments. SKIP is not a pass.
+It parses the wrapper; **it never executes it**. Only blank lines, comments, and independent numeric literal exports of the listed fields are supported. Any other shell—including unrelated commands, `exec`, multi-line conditions, functions, and heredocs—fails as unsupported. Real CCR wrappers may therefore fail this conservative check; failure does not itself prove configuration drift. Exit codes: `0` PASS/WARN, `1` FAIL or WARN under `--strict`, `2` invalid arguments. SKIP is not a pass.
 
 **Database boundary:** doctor reads a bounded source file into a private temporary copy, then queries the copy with SQLite read-only settings. It refuses inputs with `-wal`, `-shm`, or `-journal` sidecars. Supply an existing, quiet, consistent standalone backup; **do not delete live sidecars to make it pass**. It is not a backup tool or a hostile-database sandbox.
 
@@ -104,7 +104,17 @@ The module exports `setup(ctx)` and returns `gatewayRequestTransforms`. Both tra
 
 See the [configuration example](examples/plugin-config.example.json) for `pluginConfig` fields. It is **not** a complete CCR registration file. This repository deliberately does not invent an installation command for an unverified host interface.
 
-Before connecting it, read [compatibility and integration boundaries](docs/compatibility.md). In particular, partial-round handling assumes results are in the immediately following user message; histories with results spread across multiple messages are not supported.
+Before connecting it, read [compatibility and integration boundaries](docs/compatibility.md). Version 3.0.22's direct-plugin fields, permissions, module parsing, and transform return handling have now been checked in installed source; that document includes a **source-derived, not live-tested** entry shape. Actual host loading remains unverified. Partial-round handling assumes results are in the immediately following user message; histories with results spread across multiple messages are not supported.
+
+### Check what you will actually publish
+
+```bash
+python3 -I scripts/check_public_content.py          # working-directory content
+python3 -I scripts/check_public_content.py --index  # complete staged snapshot
+python3 -I scripts/check_public_content.py --head   # complete committed snapshot
+```
+
+Git modes read paths and blobs from the selected object snapshot, not your current working files. They reject tracked local/ignored directories, links, submodules, conflicts, and missing objects rather than skipping them. Lazy fetch and transport protocols are disabled; Git output is byte-bounded and its own child process is reaped on failure. These modes require local Git, do not scan history, and remain heuristic checks—not a secret-free guarantee. CI additionally checks HEAD.
 
 ### Small by design
 
@@ -152,7 +162,7 @@ bash scripts/test.sh
 
 测试只用合成消息与临时配置/数据库。**不联网、不调用模型、不改生产配置、不重启服务。**
 
-首版候选的本地验证为 **58/58 通过**：插件 27 项、doctor 26 项、内容扫描 5 项。GitHub CI 在 Linux 运行离线套件，页首徽章可查看最新结果；详见[验证记录](docs/verification.md)。
+首版候选本地验证为 **58/58 通过**。当前加固版的本地验证为 **80/80**：插件27项、doctor31项、内容扫描22项。本地数字不代表本轮改动已通过远端CI，请核对对应提交的Actions运行结果。页首徽章链接到公开分支的结果，详见[验证记录](docs/verification.md)。
 
 ### 里面有什么？
 
@@ -192,7 +202,7 @@ bash bin/ccr-doctor.sh \
 - `CLAUDE_CODE_MAX_CONTEXT_TOKENS`
 - `DISABLE_AUTOUPDATER`
 
-只解析 wrapper，**不执行 wrapper**。动态表达式与不支持的格式会报告失败，不会悄悄算作一致。退出码：`0` 为 PASS/WARN，`1` 为 FAIL（`--strict` 下 WARN 也为 `1`），`2` 为参数错误。SKIP 不等于通过。
+只解析wrapper，**不执行wrapper**。仅接受空行、注释、上列字段的独立字面量数字export；其它shell（包括不相关命令、exec、多行条件、函数、heredoc）都会报不支持。真实CCR wrapper可能因此无法通过保守检查；失败本身不等于确认配置漂移。退出码：`0`为PASS/WARN，`1`为FAIL（`--strict`下WARN也为`1`），`2`为参数错误。SKIP不等于通过。
 
 **数据库边界：** 有界读取源文件到私有临时副本，再以 SQLite 只读设置查询副本。发现 `-wal`、`-shm`、`-journal` 即拒绝。请提供已有、安静且一致的独立备份；**不要为了通过检查而删除生产旁文件**。这不是备份工具，也不是敌对数据库沙箱。
 
@@ -216,7 +226,17 @@ bash bin/ccr-doctor.sh --usage \
 
 [配置样例](examples/plugin-config.example.json) 展示 `pluginConfig` 字段，**不是完整 CCR 注册文件**。真实宿主接口未验证前，不提供猜测性的安装命令。
 
-接入前请读[兼容与接入边界](docs/compatibility.md)。尤其注意：部分回合处理假定结果在紧邻的下一条 user 消息中；结果分散在多条消息里的历史不受支持。
+接入前请读[兼容与接入边界](docs/compatibility.md)。已从安装源码核实3.0.22直接插件字段、权限、module解析及transform返回应用，文档附**源码推导、未实机验证**的条目结构；真实宿主加载仍未验证。部分回合处理假定结果在紧邻的下一条user消息中，结果分散在多条消息里的历史不受支持。
+
+### 检查真正将要发布的内容
+
+```bash
+python3 -I scripts/check_public_content.py          # 工作目录内容
+python3 -I scripts/check_public_content.py --index  # 完整暂存快照
+python3 -I scripts/check_public_content.py --head   # 完整已提交快照
+```
+
+Git模式从选定快照读取路径和blob，不以当前工作文件替代；已跟踪的本地/忽略目录、链接、子模块、冲突和缺失对象都会拒绝，不再跳过。禁lazy fetch与传输协议，有界读取Git输出，失败时回收自己启动的子进程。这些模式需要本地Git、不扫历史，仍是启发式门禁，不保证识别所有秘密。CI另加HEAD检查。
 
 ### 有意保持小而克制
 
