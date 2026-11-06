@@ -1,11 +1,10 @@
 # CCR Toolkit
 
-**Small, opt-in fixes for awkward Claude Code Router failures.**
-
-**把难排查的 CCR 问题，变成可验证、按需启用的小工具。**
+**Focused, offline-testable fixes and diagnostics for Claude Code Router.**
+**为 Claude Code Router 提供聚焦、可离线验证的修复与诊断小工具。**
 
 [![Offline checks](https://github.com/LingXi-fur/ccr-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/LingXi-fur/ccr-toolkit/actions/workflows/ci.yml)
-[MIT License](LICENSE) · No third-party runtime dependencies · No API key needed to try
+[MIT](LICENSE) · Zero runtime dependencies · No account, key, or install step
 
 [English](#english) · [简体中文](#简体中文)
 
@@ -13,24 +12,20 @@
 
 ## English
 
-### Less guesswork. Smaller fixes.
+### Why this exists
 
-A few screenshots should not turn tool output into a wall of billable base64. A partial tool round should not send you hunting through an entire router installation. And checking configuration drift should not require a restart.
+Two failure classes cost real hours before they were understood:
 
-CCR Toolkit extracts focused fixes and diagnostics from hands-on troubleshooting into a small repository you can **read, test offline, and adapt**—without copying someone else's credentials or routing setup.
+1. **A screenshot became a billable wall of text.** One 219 KB image inside a `tool_result` was forwarded as inline base64 text — **147,618 input tokens for a single image**, and four of them reliably triggered upstream `400 context_too_large`.
+2. **A legal partial tool round was rejected.** Claude Code may send one assistant message with N tool calls and answer with M < N results in the next user message. Some upstreams demand an output for every call and answer `400 No tool output found for function call`.
 
-**Clone it if you want to:**
+CCR Toolkit extracts the fixes for both, plus a drift checker and a publish gate, into one small repository you can **read, test offline, and adapt** — without copying anyone's credentials or routing setup.
 
-- Investigate tool-result media being forwarded as text and inflating requests.
-- Reproduce an upstream rejection of partially completed parallel tool calls.
-- Compare selected settings across Claude Code, a CCR profile, and its wrapper.
-- Start with synthetic regression tests instead of experimenting on a live session.
+> **Experimental `0.1.0` · Unofficial.** Algorithms have synthetic tests; real CCR plugin loading is not yet verified. This is a toolkit to evaluate, not a drop-in installer.
 
-> **Experimental `0.1.0` · Unofficial.** The algorithms have synthetic tests; real CCR plugin registration/loading and cross-version compatibility are not yet verified. Treat this as a toolkit to evaluate, not a drop-in production installer.
+### Quick start
 
-### Try it—no account, key, or install step
-
-Requirements: **Node.js 20+**, **Python 3.9+**, and **Bash**. No `npm install` needed.
+Requirements: **Node.js 20+**, **Python 3.9+**, **Bash**. No `npm install`.
 
 ```bash
 git clone https://github.com/LingXi-fur/ccr-toolkit.git
@@ -38,98 +33,93 @@ cd ccr-toolkit
 bash scripts/test.sh
 ```
 
-The suite uses synthetic messages and temporary configurations/databases. **No network, model calls, production configuration changes, or service restarts.**
+Synthetic messages and temporary configurations only. **No network, no model calls, no production changes, no restarts.** Current suite: **107/107** (plugin 27, doctor 31, content scanner 22, preflight gate 27). Not real-host integration evidence; check the badge run for the commit you care about.
 
-The initial candidate passed **58/58 local tests**, and the previous hardening pass reached **80/80**. The current local suite passes **107/107**: 27 plugin, 31 doctor, 22 content-scanner, and 27 offline preflight-gate regressions. The default suite remains offline and never starts CCR or runs the real sandbox probe. These results are not real-host integration evidence and do not establish remote CI success for this revision; check the matching commit's Actions run. The badge links to the published branch. See [verification details](docs/verification.md).
+### What's inside
 
-### What's inside?
-
-| Component | What it does | Guardrail |
+| Component | Solves | Guardrail |
 | --- | --- | --- |
-| `strip-tool-images` | Replaces tool-result media and detected large binary payloads with text placeholders | Explicit provider opt-in; top-level user media left untouched |
-| `fix-partial-tool-rounds` | Omits assistant tool calls without results in the immediately following user message | Only edits assistant calls; preserves an empty assistant turn with a placeholder |
-| `ccr-doctor` | Checks selected static environment fields and input-file permissions; optionally checks health and usage aggregates | Offline by default; no automatic repairs or config execution |
-| Release-content checks | Flags likely credentials, personal paths, and unexpected files | Reports locations, not matched values; not a substitute for manual review |
+| `strip-tool-images` | Tool-result media and detected large binary payloads → text placeholders | Explicit provider opt-in; top-level user media untouched |
+| `fix-partial-tool-rounds` | Omits assistant tool calls still missing results in the next user message | Only edits assistant calls; keeps a placeholder for emptied turns |
+| `ccr-doctor` | Environment drift across Claude Code / CCR profile / wrapper; permissions; optional health & usage | Offline by default; parses wrappers, never executes them |
+| `check_public_content.py` | Likely credentials, personal paths, unexpected files before publishing | Reports locations only, never matched values |
 
-For example, the media transform turns a tool result like this:
+The media transform in one line:
 
 ```text
 tool_result: [image(base64…), text("Build passed")]
-                           ↓
+              ↓
 tool_result: [text("[image omitted]"), text("Build passed")]
 ```
 
-**This is lossy compatibility handling, not a multimodal upgrade.** Use it only for an upstream with a confirmed problem. If the task needs tool-returned images or documents, dropping them is not a complete fix.
+**Lossy compatibility, not a multimodal upgrade** — use only against an upstream with a confirmed problem.
 
-### Run a read-only diagnostic
+### Repository layout
+
+```text
+plugins/tool-result-compat/   the two gateway transforms (single .mjs, no deps)
+bin/ccr-doctor.sh             thin entry for the doctor
+scripts/doctor.py             static diagnostics (bounded reads, snapshot DB)
+scripts/check_public_content.py  publish-content gate (worktree / index / HEAD)
+scripts/run_real_host.py      preflight-only real-host readiness gate
+tests/                        107 offline regressions (Python + Node)
+docs/                         compatibility, verification, troubleshooting (Chinese)
+```
+
+### Diagnostics without side effects
 
 ```bash
-# Show options without inspecting your configuration
+# Show options only
 bash bin/ccr-doctor.sh --help
 
-# Inspect existing, quiet configuration copies kept OUTSIDE this repository
-bash bin/ccr-doctor.sh \
-  --ccr-dir ../private-ccr-input \
-  --claude-dir ../private-claude-input \
-  --strict
-```
+# Check drift across the three config surfaces (defaults to your real paths)
+bash bin/ccr-doctor.sh
 
-Without path options, doctor uses the current user's `.claude-code-router` and `.claude` directories. It checks only these static environment fields:
-
-- `CLAUDE_CODE_AUTO_COMPACT_WINDOW`
-- `CLAUDE_CODE_MAX_CONTEXT_TOKENS`
-- `DISABLE_AUTOUPDATER`
-
-It parses the wrapper; **it never executes it**. Only blank lines, comments, and independent numeric literal exports of the listed fields are supported. Any other shell—including unrelated commands, `exec`, multi-line conditions, functions, and heredocs—fails as unsupported. Real CCR wrappers may therefore fail this conservative check; failure does not itself prove configuration drift. Exit codes: `0` PASS/WARN, `1` FAIL or WARN under `--strict`, `2` invalid arguments. SKIP is not a pass.
-
-**Database boundary:** doctor reads a bounded source file into a private temporary copy, then queries the copy with SQLite read-only settings. It refuses inputs with `-wal`, `-shm`, or `-journal` sidecars. Supply an existing, quiet, consistent standalone backup; **do not delete live sidecars to make it pass**. It is not a backup tool or a hostile-database sandbox.
-
-Optional checks require explicit flags:
-
-```bash
-# Loopback /health only; no proxy, redirects, or model request
+# Optional, explicit opt-in extras
 bash bin/ccr-doctor.sh --health --front-port 3460 --core-port 3461
-
-# Aggregate recorded routes for the past 24 hours; no request-body output
-bash bin/ccr-doctor.sh --usage \
-  --expected-model example-model \
-  --expected-provider example-provider
+bash bin/ccr-doctor.sh --usage --expected-model example-model --expected-provider example-provider
 ```
 
-Health success does not attest to service identity. Recorded provider/model fields do not prove which model an upstream actually executed. Usage input must also satisfy the quiet-database requirement.
+Boundaries worth knowing before you trust a result:
 
-### Evaluate the plugin before connecting it
+- **Static fields only**: `CLAUDE_CODE_AUTO_COMPACT_WINDOW`, `CLAUDE_CODE_MAX_CONTEXT_TOKENS`, `DISABLE_AUTOUPDATER`. Wrappers are parsed as literal exports — anything beyond blank lines, comments, and simple numeric exports of those fields fails as unsupported. A FAIL here means "cannot verify", not "definitely drifted".
+- **Databases**: a bounded copy is queried read-only; active `-wal`/`-shm`/`-journal` sidecars are refused. Never delete live sidecars to make a check pass.
+- **Attestation limits**: a green `/health` does not prove service identity; recorded provider/model does not prove what the upstream actually executed. SKIP is not a pass.
 
-The module exports `setup(ctx)` and returns `gatewayRequestTransforms`. Both transforms retain their IDs above and can be selected separately. **No provider is selected by default, so no requests are changed.**
+Exit codes: `0` PASS/WARN, `1` FAIL (or WARN under `--strict`), `2` invalid arguments.
 
-See the [configuration example](examples/plugin-config.example.json) for `pluginConfig` fields. It is **not** a complete CCR registration file. This repository deliberately does not invent an installation command for an unverified host interface.
+### Evaluate the plugin before wiring it in
 
-Before connecting it, read [compatibility and integration boundaries](docs/compatibility.md). Version 3.0.22's direct-plugin fields, permissions, module parsing, and transform return handling have now been checked in installed source; that document includes a **source-derived, not live-tested** entry shape. The locally installed host moved to 3.1.3 on 2026-11-06; those plugin facts were not re-audited for 3.1.3 (the metadata gate now pins 3.1.3). Actual host loading remains unverified. Partial-round handling assumes results are in the immediately following user message; histories with results spread across multiple messages are not supported.
+`setup(ctx)` returns two `gatewayRequestTransforms`, selectable by ID. **No provider is selected by default, so nothing changes until you opt in.** See the [configuration example](examples/plugin-config.example.json) — it is not a complete registration file, and this repo deliberately ships no install command for an unverified host interface.
 
-Real-host validation is **blocked; CCR has not been started**. `scripts/run_real_host.py` is **preflight-only**: explicit opt-in and an entry path permit only metadata checks and a fixed `true` sandbox probe, never CCR startup. Even a successful probe ends with `BLOCKED integration-not-implemented` and exit code 2. Three one-at-a-time approved probes exited -6/71/-11 as the policy approached a complete bootstrap set; per the hard-stop rule the probe route is paused — resuming real integration requires a separately scoped isolation mechanism and a fresh authorization scope. See the [current blocker and safety boundaries](docs/compatibility.md); no unsandboxed fallback is provided.
+Real-host status, stated once and honestly:
+
+- Host plugin facts (fields, permissions, module resolution, transform application) were **source-audited on CCR 3.0.22**. The local install moved to **3.1.3 on 2026-11-06**; those facts were not re-audited, and the preflight metadata gate now pins 3.1.3.
+- Real loading is **unverified; CCR has never been started by this repo**. `run_real_host.py` is preflight-only — explicit opt-in permits a metadata check and a fixed `true` sandbox probe, never CCR startup; even success ends `BLOCKED integration-not-implemented`, exit 2.
+- Three individually approved probes exited −6 / 71 / −11 while the policy approached a complete bootstrap set; the hard-stop rule paused that route. Resuming needs a separately scoped isolation mechanism and fresh authorization. No unsandboxed fallback exists.
+
+Details: [compatibility](docs/compatibility.md) · [verification](docs/verification.md).
 
 ### Check what you will actually publish
 
 ```bash
-python3 -I scripts/check_public_content.py          # working-directory content
+python3 -I scripts/check_public_content.py          # working directory
 python3 -I scripts/check_public_content.py --index  # complete staged snapshot
 python3 -I scripts/check_public_content.py --head   # complete committed snapshot
 ```
 
-Git modes read paths and blobs from the selected object snapshot, not your current working files. They reject tracked local/ignored directories, links, submodules, conflicts, and missing objects rather than skipping them. Lazy fetch and transport protocols are disabled; Git output is byte-bounded and its own child process is reaped on failure. These modes require local Git, do not scan history, and remain heuristic checks—not a secret-free guarantee. CI additionally checks HEAD.
+Git modes read the selected object snapshot (not worktree files), reject links/submodules/conflicts/missing objects instead of skipping, disable lazy fetch and transports, and byte-bound all Git output. Heuristic gate, not a secret-free guarantee. CI additionally checks HEAD on every push.
 
 ### Small by design
 
-- **No global bundle patching, automatic registration, model switching, or credential storage.**
-- **No stop/restart/kill, database restore, checkpoint, or permission changes.**
-- **No personal configurations, conversations, screenshots, or production replays bundled.**
-- Static review findings were fixed and the five fixes were re-reviewed; this is not a comprehensive security certification.
+- **No** global bundle patching, auto-registration, model switching, or credential storage.
+- **No** stop/restart/kill, database restore, checkpoint, or permission changes.
+- **No** personal configurations, conversations, screenshots, or production replays bundled.
+- Static review findings were fixed and re-reviewed; that is not a security certification.
 
-Explore: [troubleshooting](docs/troubleshooting.md) · [compatibility](docs/compatibility.md) · [verification](docs/verification.md) · [security](SECURITY.md) · [sources & notices](THIRD_PARTY_NOTICES.md). Supporting documents are currently in Chinese; this README covers the essential commands and limits in both languages.
+### Contribute & license
 
-### Help make it useful on more setups
-
-Contributions most welcome: **version-specific integration evidence, synthetic edge cases, clearer diagnostics, and documentation translations**. Run `bash scripts/test.sh` before proposing a change. For a bug report, include versions, expected behavior, and a synthetic reproduction—not raw databases, requests, logs, or secrets. See [SECURITY.md](SECURITY.md) for sensitive reports.
+Most welcome: **version-specific integration evidence, synthetic edge cases, clearer diagnostics, translations**. Run `bash scripts/test.sh` before proposing changes. Bug reports: versions, expected behavior, synthetic reproduction — never raw databases, requests, logs, or secrets. Sensitive reports follow [SECURITY.md](SECURITY.md).
 
 MIT licensed. Independent from, and not endorsed by, [Claude Code Router](https://github.com/musistudio/claude-code-router).
 
@@ -137,24 +127,20 @@ MIT licensed. Independent from, and not endorsed by, [Claude Code Router](https:
 
 ## 简体中文
 
-### 少猜原因，少动环境。
+### 为什么有这个仓库
 
-几张截图，不该让工具输出变成一大段按文本处理的 base64。一次未完成的并行工具回合，不该让你翻遍整个路由器安装目录。查配置漂移，更不该先重启服务。
+两类真实故障，弄明白之前各耗掉数小时：
 
-CCR Toolkit 把实际排错中积累的修复与诊断，提取成一套**源码可读、离线可测、按需接入**的小工具。不需要照搬别人的密钥、路由配置或运行环境。
+1. **一张截图变成一整段计费文本。** `tool_result` 里一张 219 KB 图片被按内联 base64 文本转发——**单图 147,618 input tokens**，四张就稳定触发上游 `400 context_too_large`。
+2. **合法的部分工具回合被拒。** Claude Code 允许一条 assistant 消息发 N 个工具调用、下一条 user 消息只回 M < N 个结果；部分上游要求每个调用都有输出，直接回 `400 No tool output found for function call`。
 
-**遇到这些问题，值得 clone 看看：**
+CCR Toolkit 把这两个修复，加上漂移检查与发布门禁，提取成一套**源码可读、离线可测、按需接入**的小工具，不需要照搬任何人的密钥或路由配置。
 
-- 工具返回的图片或二进制被当作文本转发，请求体或 token 用量异常膨胀。
-- 并行工具只返回部分结果，上游却要求每个调用都有 output。
-- Claude Code、CCR profile 与 wrapper 的部分配置对不上。
-- 想先用合成回归复现问题，而不是拿正在工作的会话试错。
+> **实验候选版 `0.1.0` · 非官方。** 算法有合成测试；真实 CCR 插件加载尚未验证。适合先评估、再适配，不是开箱即用的安装器。
 
-> **实验候选版 `0.1.0` · 非官方组件。** 算法已做合成测试；真实 CCR 插件注册/加载与跨版本兼容尚未验证。适合先评估、再适配，不是开箱即用的生产安装器。
+### 快速开始
 
-### 先试用：不需要账号、Key 或安装依赖
-
-要求：**Node.js 20+、Python 3.9+、Bash**。无需 `npm install`。
+要求：**Node.js 20+、Python 3.9+、Bash**，无需 `npm install`。
 
 ```bash
 git clone https://github.com/LingXi-fur/ccr-toolkit.git
@@ -162,97 +148,92 @@ cd ccr-toolkit
 bash scripts/test.sh
 ```
 
-测试只用合成消息与临时配置/数据库。**不联网、不调用模型、不改生产配置、不重启服务。**
+只用合成消息与临时配置。**不联网、不调模型、不改生产配置、不重启服务。** 当前套件 **107/107**（插件 27、doctor 31、内容扫描 22、预检门禁 27）。这不是实机集成证据；请核对你所关注提交对应的徽章 Actions 运行。
 
-首版候选本地验证为 **58/58 通过**，上一轮加固达到 **80/80**。当前本地套件 **107/107 通过**：插件27项、doctor31项、内容扫描22项、离线预检门禁27项。默认套件保持离线，不启动CCR，也不执行真实沙箱探针。这些结果不是实机集成证据，也不代表本轮改动已通过远端CI，请核对对应提交的Actions运行结果。页首徽章链接到公开分支的结果，详见[验证记录](docs/verification.md)。
+### 里面有什么
 
-### 里面有什么？
-
-| 组件 | 解决什么 | 默认保护 |
+| 组件 | 解决什么 | 防护 |
 | --- | --- | --- |
-| `strip-tool-images` | 将工具结果媒体和检测到的大二进制替换为文本占位 | 必须显式选择 provider；顶层 user 媒体不动 |
-| `fix-partial-tool-rounds` | 略去紧邻下一条 user 消息中尚无结果的 assistant 工具调用 | 只改 assistant 调用；空 assistant 回合保留占位 |
-| `ccr-doctor` | 查部分静态环境配置与输入文件权限；可选健康检查和 usage 聚合 | 默认离线；不自动修复、不执行配置 |
-| 发布内容检查 | 标记疑似凭据、个人路径和非预期文件 | 只报位置，不回显命中内容；不能代替人工审查 |
+| `strip-tool-images` | 工具结果媒体与检测到的大二进制 → 文本占位 | 必须显式选 provider；顶层 user 媒体不动 |
+| `fix-partial-tool-rounds` | 略去下一条 user 消息中仍无结果的 assistant 工具调用 | 只改 assistant 调用；空回合保留占位 |
+| `ccr-doctor` | Claude Code / CCR profile / wrapper 三面环境漂移；权限；可选健康与用量 | 默认离线；解析 wrapper、绝不执行 |
+| `check_public_content.py` | 发布前的疑似凭据、个人路径、非预期文件 | 只报位置，不回显命中内容 |
 
-例如，媒体变换会把这类工具结果：
+媒体变换一行示例：
 
 ```text
 tool_result: [image(base64…), text("Build passed")]
-                           ↓
+              ↓
 tool_result: [text("[image omitted]"), text("Build passed")]
 ```
 
-**这是有损兼容，不是多模态能力增强。** 仅用于已确认有问题的上游。如果任务需要工具返回的图片或文档，删掉它们不算完整修复。
+**这是有损兼容，不是多模态增强**——仅用于已确认有问题的上游。
 
-### 跑一次只读诊断
+### 仓库布局
+
+```text
+plugins/tool-result-compat/   两个网关 transform（单 .mjs，零依赖）
+bin/ccr-doctor.sh             doctor 薄入口
+scripts/doctor.py             静态诊断（有界读取、快照查库）
+scripts/check_public_content.py  发布内容门禁（工作区 / 暂存 / HEAD）
+scripts/run_real_host.py      仅预检的实机就绪门禁
+tests/                        107 项离线回归（Python + Node）
+docs/                         兼容、验证、排错文档（中文）
+```
+
+### 无副作用的诊断
 
 ```bash
-# 只看参数，不读取你的配置
+# 只看参数
 bash bin/ccr-doctor.sh --help
 
-# 检查仓库外已有、安静的独立配置副本
-bash bin/ccr-doctor.sh \
-  --ccr-dir ../private-ccr-input \
-  --claude-dir ../private-claude-input \
-  --strict
-```
+# 检查三个配置面的漂移（默认读当前用户真实路径）
+bash bin/ccr-doctor.sh
 
-不指定路径时，doctor 使用当前用户的 `.claude-code-router` 与 `.claude`。静态环境比对仅包含：
-
-- `CLAUDE_CODE_AUTO_COMPACT_WINDOW`
-- `CLAUDE_CODE_MAX_CONTEXT_TOKENS`
-- `DISABLE_AUTOUPDATER`
-
-只解析wrapper，**不执行wrapper**。仅接受空行、注释、上列字段的独立字面量数字export；其它shell（包括不相关命令、exec、多行条件、函数、heredoc）都会报不支持。真实CCR wrapper可能因此无法通过保守检查；失败本身不等于确认配置漂移。退出码：`0`为PASS/WARN，`1`为FAIL（`--strict`下WARN也为`1`），`2`为参数错误。SKIP不等于通过。
-
-**数据库边界：** 有界读取源文件到私有临时副本，再以 SQLite 只读设置查询副本。发现 `-wal`、`-shm`、`-journal` 即拒绝。请提供已有、安静且一致的独立备份；**不要为了通过检查而删除生产旁文件**。这不是备份工具，也不是敌对数据库沙箱。
-
-可选检查必须显式开启：
-
-```bash
-# 只请求回环 /health；禁代理和重定向，不发模型请求
+# 可选、需显式开启
 bash bin/ccr-doctor.sh --health --front-port 3460 --core-port 3461
-
-# 聚合过去24小时的记录路由，不输出请求正文
-bash bin/ccr-doctor.sh --usage \
-  --expected-model example-model \
-  --expected-provider example-provider
+bash bin/ccr-doctor.sh --usage --expected-model example-model --expected-provider example-provider
 ```
 
-健康状态不能证明服务身份；usage 里的 provider/model 记录不能证明上游实际执行了哪个模型。usage 输入同样必须满足安静数据库要求。
+信任结果前先知道的边界：
+
+- **只查静态字段**：`CLAUDE_CODE_AUTO_COMPACT_WINDOW`、`CLAUDE_CODE_MAX_CONTEXT_TOKENS`、`DISABLE_AUTOUPDATER`。wrapper 按字面量 export 解析——空行、注释、上列字段独立数字 export 之外的任何 shell 都报不支持。FAIL 含义是"无法验证"，不是"确定漂移"。
+- **数据库**：有界复制后只读查询；发现活跃 `-wal`/`-shm`/`-journal` 即拒绝。永远不要为通过检查去删生产旁文件。
+- **证明力上限**：`/health` 绿不证明服务身份；记录的 provider/model 不证明上游实际执行的模型。SKIP 不等于通过。
+
+退出码：`0` PASS/WARN，`1` FAIL（`--strict` 下 WARN 也算），`2` 参数错误。
 
 ### 插件先评估，再接入
 
-模块导出 `setup(ctx)`，返回 `gatewayRequestTransforms`。两个 transform 保留上表中的 ID，可分别启用。**默认不选任何 provider，因此不改任何请求。**
+`setup(ctx)` 返回两个 `gatewayRequestTransforms`，按 ID 可分别启用。**默认不选任何 provider，未显式启用前不改任何请求。** 见[配置样例](examples/plugin-config.example.json)——它不是完整注册文件，宿主接口未验证前本仓库刻意不提供安装命令。
 
-[配置样例](examples/plugin-config.example.json) 展示 `pluginConfig` 字段，**不是完整 CCR 注册文件**。真实宿主接口未验证前，不提供猜测性的安装命令。
+实机状态，一次说清：
 
-接入前请读[兼容与接入边界](docs/compatibility.md)。已从安装源码核实3.0.22直接插件字段、权限、module解析及transform返回应用，文档附**源码推导、未实机验证**的条目结构；本机宿主2026-11-06升级至3.1.3，插件事实未随3.1.3复审（元数据门禁已改指3.1.3）；真实宿主加载仍未验证。部分回合处理假定结果在紧邻的下一条user消息中，结果分散在多条消息里的历史不受支持。
+- 宿主插件事实（字段、权限、module 解析、transform 应用）系 **CCR 3.0.22 安装源码审计**。本机 2026-11-06 升至 **3.1.3**；上述事实未随 3.1.3 复审，预检元数据门禁已改 pin 3.1.3。
+- 真实加载**未验证；本仓库从未启动过 CCR**。`run_real_host.py` 仅预检——显式 opt-in 只允许元数据检查与固定 `true` 沙箱探针，绝不启动 CCR；即便探针成功也以 `BLOCKED integration-not-implemented`、退出码 2 结束。
+- 三次逐次批准的探针以 −6 / 71 / −11 退出，策略逐步逼近完整启动集合；按硬停点规则该路线已暂停。恢复需另定隔离机制与新的授权范围。不提供无沙箱降级。
 
-真实宿主验证目前**阻塞，CCR尚未启动**。`scripts/run_real_host.py` **仅做预检**：明确opt-in并指定入口后，只检查元数据并执行固定`true`沙箱探针，不启动CCR。即使探针成功，仍以`BLOCKED integration-not-implemented`及退出码2结束。三次逐次批准的探针以-6/71/-11退出，策略逐步逼近完整启动集合；按硬停点规则探针路线暂停，恢复真实集成须另定隔离机制与授权范围。当前阻塞与安全边界见[兼容说明](docs/compatibility.md)；不提供无沙箱降级入口。
+细节：[兼容边界](docs/compatibility.md) · [验证记录](docs/verification.md)。
 
-### 检查真正将要发布的内容
+### 检查真正要发布的内容
 
 ```bash
-python3 -I scripts/check_public_content.py          # 工作目录内容
+python3 -I scripts/check_public_content.py          # 工作目录
 python3 -I scripts/check_public_content.py --index  # 完整暂存快照
 python3 -I scripts/check_public_content.py --head   # 完整已提交快照
 ```
 
-Git模式从选定快照读取路径和blob，不以当前工作文件替代；已跟踪的本地/忽略目录、链接、子模块、冲突和缺失对象都会拒绝，不再跳过。禁lazy fetch与传输协议，有界读取Git输出，失败时回收自己启动的子进程。这些模式需要本地Git、不扫历史，仍是启发式门禁，不保证识别所有秘密。CI另加HEAD检查。
+Git 模式读选定对象快照（不是工作区文件）；链接、子模块、冲突、缺失对象一律拒绝而不是跳过；禁 lazy fetch 与传输协议，Git 输出全部有界。属启发式门禁，不保证零秘密。CI 每次推送另查 HEAD。
 
 ### 有意保持小而克制
 
-- **不改全局 bundle、不自动注册、不切模型、不保存凭据。**
-- **不 stop/restart/kill、不恢复数据库、不 checkpoint、不改权限。**
-- **不附带个人配置、会话、截图或生产重放。**
-- 静态复核发现的问题已修复，五项修复已复核；不把这些包装成全面安全认证。
+- **不**改全局 bundle、不自动注册、不切模型、不存凭据。
+- **不** stop/restart/kill、不恢复数据库、不 checkpoint、不改权限。
+- **不**附带个人配置、会话、截图或生产重放。
+- 静态复核发现的问题已修复并复核；不把这包装成安全认证。
 
-继续了解：[排错](docs/troubleshooting.md) · [兼容边界](docs/compatibility.md) · [验证记录](docs/verification.md) · [安全](SECURITY.md) · [来源与许可](THIRD_PARTY_NOTICES.md)。补充文档目前以中文为主，本 README 提供完整中英入口、命令与核心限制。
+### 贡献与许可
 
-### 一起让更多环境用得上
-
-欢迎贡献：**具体 CCR 版本的接入证据、合成边界用例、更清楚的诊断、文档翻译**。提交改动前运行 `bash scripts/test.sh`。报告问题请附版本、预期行为与合成复现，不上传原数据库、真实请求、日志或秘密。敏感问题按 [SECURITY.md](SECURITY.md) 处理。
+最欢迎：**具体 CCR 版本的接入证据、合成边界用例、更清楚的诊断、翻译**。提交前跑 `bash scripts/test.sh`。报问题请附版本、预期行为、合成复现——不上传原始数据库、请求、日志或秘密。敏感报告走 [SECURITY.md](SECURITY.md)。
 
 MIT 许可。独立于 [Claude Code Router](https://github.com/musistudio/claude-code-router)，不代表上游背书。
