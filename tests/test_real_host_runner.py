@@ -110,7 +110,10 @@ class ReadinessTests(unittest.TestCase):
             self.assertEqual(gate.main(['--allow-real-host', '--ccr-entry', '/synthetic/cli.js']), 2)
         inspect.assert_not_called()
 
-    def fixture_entry(self, version='3.1.3', name='@musistudio/claude-code-router'):
+    def fixture_entry(self, version=None, name=None):
+        import json
+        version = version or gate.EXPECTED_VERSION
+        name = name or gate.EXPECTED_PACKAGE
         import json
         package = self.root / 'package'
         entry = package / 'dist' / 'main' / 'cli.js'

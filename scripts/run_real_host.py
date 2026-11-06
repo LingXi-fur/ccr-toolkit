@@ -20,6 +20,11 @@ import time
 MAX_METADATA = 65536
 MAX_ENTRY = 16 * 1024 * 1024
 MAX_OUTPUT = 65536
+# Single source of truth for the pinned host version; bump this on upgrade.
+# Source-derived plugin facts in docs were audited on 3.0.22 bytes and
+# are not re-audited per upgrade.
+EXPECTED_PACKAGE = '@musistudio/claude-code-router'
+EXPECTED_VERSION = '3.1.3'
 
 
 class GateError(Exception):
@@ -55,10 +60,7 @@ def inspect_entry(value):
     if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_ENTRY:
         raise GateError('unsupported-entry')
     metadata = json.loads(bounded_regular(path.parents[2] / 'package.json', MAX_METADATA))
-    # Pin tracks the locally installed version (3.1.3 since 2026-11-06).
-    # Source-derived plugin facts in docs were audited on 3.0.22 bytes and
-    # are not re-audited for this version.
-    if not isinstance(metadata, dict) or metadata.get('name') != '@musistudio/claude-code-router' or metadata.get('version') != '3.1.3':
+    if not isinstance(metadata, dict) or metadata.get('name') != EXPECTED_PACKAGE or metadata.get('version') != EXPECTED_VERSION:
         raise GateError('unsupported-package')
     return path
 
