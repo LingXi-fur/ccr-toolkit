@@ -104,7 +104,7 @@ The module exports `setup(ctx)` and returns `gatewayRequestTransforms`. Both tra
 
 See the [configuration example](examples/plugin-config.example.json) for `pluginConfig` fields. It is **not** a complete CCR registration file. This repository deliberately does not invent an installation command for an unverified host interface.
 
-Before connecting it, read [compatibility and integration boundaries](docs/compatibility.md). Version 3.0.22's direct-plugin fields, permissions, module parsing, and transform return handling have now been checked in installed source; that document includes a **source-derived, not live-tested** entry shape. Actual host loading remains unverified. Partial-round handling assumes results are in the immediately following user message; histories with results spread across multiple messages are not supported.
+Before connecting it, read [compatibility and integration boundaries](docs/compatibility.md). Version 3.0.22's direct-plugin fields, permissions, module parsing, and transform return handling have now been checked in installed source; that document includes a **source-derived, not live-tested** entry shape. The locally installed host moved to 3.1.3 on 2026-11-06; those plugin facts were not re-audited for 3.1.3 (the metadata gate now pins 3.1.3). Actual host loading remains unverified. Partial-round handling assumes results are in the immediately following user message; histories with results spread across multiple messages are not supported.
 
 Real-host validation is **blocked; CCR has not been started**. `scripts/run_real_host.py` is **preflight-only**: explicit opt-in and an entry path permit only metadata checks and a fixed `true` sandbox probe, never CCR startup. Even a successful probe ends with `BLOCKED integration-not-implemented` and exit code 2. Three one-at-a-time approved probes exited -6/71/-11 as the policy approached a complete bootstrap set; per the hard-stop rule the probe route is paused — resuming real integration requires a separately scoped isolation mechanism and a fresh authorization scope. See the [current blocker and safety boundaries](docs/compatibility.md); no unsandboxed fallback is provided.
 
@@ -228,7 +228,7 @@ bash bin/ccr-doctor.sh --usage \
 
 [配置样例](examples/plugin-config.example.json) 展示 `pluginConfig` 字段，**不是完整 CCR 注册文件**。真实宿主接口未验证前，不提供猜测性的安装命令。
 
-接入前请读[兼容与接入边界](docs/compatibility.md)。已从安装源码核实3.0.22直接插件字段、权限、module解析及transform返回应用，文档附**源码推导、未实机验证**的条目结构；真实宿主加载仍未验证。部分回合处理假定结果在紧邻的下一条user消息中，结果分散在多条消息里的历史不受支持。
+接入前请读[兼容与接入边界](docs/compatibility.md)。已从安装源码核实3.0.22直接插件字段、权限、module解析及transform返回应用，文档附**源码推导、未实机验证**的条目结构；本机宿主2026-11-06升级至3.1.3，插件事实未随3.1.3复审（元数据门禁已改指3.1.3）；真实宿主加载仍未验证。部分回合处理假定结果在紧邻的下一条user消息中，结果分散在多条消息里的历史不受支持。
 
 真实宿主验证目前**阻塞，CCR尚未启动**。`scripts/run_real_host.py` **仅做预检**：明确opt-in并指定入口后，只检查元数据并执行固定`true`沙箱探针，不启动CCR。即使探针成功，仍以`BLOCKED integration-not-implemented`及退出码2结束。三次逐次批准的探针以-6/71/-11退出，策略逐步逼近完整启动集合；按硬停点规则探针路线暂停，恢复真实集成须另定隔离机制与授权范围。当前阻塞与安全边界见[兼容说明](docs/compatibility.md)；不提供无沙箱降级入口。
 

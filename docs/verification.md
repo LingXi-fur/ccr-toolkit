@@ -10,7 +10,7 @@
 
 已交付内容：
 
-- 新增`scripts/run_real_host.py`：**preflight-only**。需显式`--allow-real-host`与`--ccr-entry`；只检查3.0.22包元数据（不是来源认证）并执行固定`true`能力探针。探针成功仍以退出码2报告`BLOCKED integration-not-implemented`；不存在CCR执行通路。输出、超时有界，自启child回收，临时根按所有权标记清理。策略经第二次复验后最小补齐（按实测拒绝加三个syscall编号，另按`system.sb:119`先例加`/dev/fd`描述符写），精确规则文本有全等测试锁定。
+- 新增`scripts/run_real_host.py`：**preflight-only**。需显式`--allow-real-host`与`--ccr-entry`；只检查3.1.3包元数据（不是来源认证；本机2026-11-06自3.0.22升级，源码推导事实仍核自3.0.22字节）并执行固定`true`能力探针。探针成功仍以退出码2报告`BLOCKED integration-not-implemented`；不存在CCR执行通路。输出、超时有界，自启child回收，临时根按所有权标记清理。策略经第二次复验后最小补齐（按实测拒绝加三个syscall编号，另按`system.sb:119`先例加`/dev/fd`描述符写），精确规则文本有全等测试锁定。
 - 新增`tests/test_real_host_runner.py`：27项离线回归，先RED后GREEN，覆盖缺opt-in、未知包/版本/符号链接入口、参数不回显、非macOS拒绝、探针输出超限/超时/启动失败、成功仍阻塞、无沙箱不降级、child回收断言、临时根清理与精确启动权限集合。成功/失败mock均核对完整固定命令、单次调用及对应阻塞诊断。写权限测试精确限定`/dev/fd`单条规则、拒绝`file-write*`通配与磁盘写目标。
 - 新源码事实记录于[兼容边界](compatibility.md)：CLI数据根变量与`CCR_CONFIG_DIR`的区别、配置读取顺序、`serve`管理端口与副作用、gateway端点与端口0拒绝。均为3.0.22安装字节的有界静态证据，非执行结果。
 
@@ -47,7 +47,7 @@ macOS / Node.js 24.10.0 / Python 3.11.9，运行 `bash scripts/test.sh`：
 
 ### 源码契约与剩余限制
 
-CCR 3.0.22安装源码已核直接插件配置字段、权限、module解析与transform返回应用。详见[兼容边界](compatibility.md)。没有复制bundle、个人配置或真实请求。
+CCR 3.0.22安装源码已核直接插件配置字段、权限、module解析与transform返回应用（3.1.3未复审）。详见[兼容边界](compatibility.md)。没有复制bundle、个人配置或真实请求。
 
 尚未完成：
 

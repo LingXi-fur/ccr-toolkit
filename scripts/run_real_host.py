@@ -55,7 +55,10 @@ def inspect_entry(value):
     if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_ENTRY:
         raise GateError('unsupported-entry')
     metadata = json.loads(bounded_regular(path.parents[2] / 'package.json', MAX_METADATA))
-    if not isinstance(metadata, dict) or metadata.get('name') != '@musistudio/claude-code-router' or metadata.get('version') != '3.0.22':
+    # Pin tracks the locally installed version (3.1.3 since 2026-11-06).
+    # Source-derived plugin facts in docs were audited on 3.0.22 bytes and
+    # are not re-audited for this version.
+    if not isinstance(metadata, dict) or metadata.get('name') != '@musistudio/claude-code-router' or metadata.get('version') != '3.1.3':
         raise GateError('unsupported-package')
     return path
 

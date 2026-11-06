@@ -10,7 +10,7 @@
 
 ## Claude Code Router
 
-接口参考项目：[musistudio/claude-code-router](https://github.com/musistudio/claude-code-router)。本地可核安装元数据为 `@musistudio/claude-code-router` 3.0.22。项目不复制或分发其安装 bundle，不是该项目官方发行版，也不代表上游背书。
+接口参考项目：[musistudio/claude-code-router](https://github.com/musistudio/claude-code-router)。本地可核安装元数据为 `@musistudio/claude-code-router` 3.1.3（2026-11-06 起；此前为 3.0.22）。源码推导的插件事实核对自 3.0.22 安装字节，未随 3.1.3 复审。项目不复制或分发其安装 bundle，不是该项目官方发行版，也不代表上游背书。
 
 核实到的上游许可如下，保留其署名；若后续纳入任何上游代码片段，必须继续核对具体文件和版本的许可。
 

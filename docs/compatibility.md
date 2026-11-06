@@ -4,7 +4,7 @@
 
 | 层次 | 已核事实 | 尚未验证 |
 | --- | --- | --- |
-| CCR 宿主 | 3.0.22安装源码已核直接插件字段、权限、解析及transform返回应用 | configDir初始化/覆盖、市场manifest、真实加载与其他版本 |
+| CCR 宿主 | 3.0.22安装源码已核直接插件字段、权限、解析及transform返回应用（3.1.3未复审，仅元数据门禁指向3.1.3） | configDir初始化/覆盖、市场manifest、真实加载与其他版本 |
 | 插件 | 合成 host 模拟按顺序调用 transforms；返回 `{body}` 或 `undefined` | 真服务请求、生产并发与跨版本行为 |
 | Doctor | 合成 SQLite、临时 HOME、字面量export文件、模拟 HTTP 边界 | 真实wrapper通常含额外shell，可能因不支持而FAIL |
 | 运行平台 | macOS / Node24 / Python3.11；Python3.9.6另跑doctor与扫描器通过；首版Linux远端CI已通过 | 本轮Linux验证须核对对应提交的Actions结果，不能沿用首版成绩 |
@@ -39,7 +39,7 @@ Node 20+、Python 3.9+ 是代码预期最低要求，不代表每个版本已测
 
 ## 接入与撤销
 
-**真实 CCR 接入尚未验证，不提供自动安装/注册命令。** 以下是3.0.22安装源码的版本限定笔记，不是实机加载验收。
+**真实 CCR 接入尚未验证，不提供自动安装/注册命令。** 以下是3.0.22安装源码的版本限定笔记，不是实机加载验收。3.1.3（2026-11-06本机升级）未做同等源码复审；元数据门禁已改指3.1.3，插件字段行为仍以3.0.22结论为准。
 
 ### 直接插件注册契约（源码已核）
 
@@ -100,7 +100,7 @@ Node 20+、Python 3.9+ 是代码预期最低要求，不代表每个版本已测
 
 第三次复验返回`-11`（SIGSEGV）。崩溃报告栈为dyld `mach_init → _pthread_set_self_dyld → __thread_selfid → cerror`（`EXC_BAD_ACCESS: KERN_INVALID_ADDRESS at 0x8`）：栈序与近空地址与同窗`SYS_thread_selfid`(372，SDK `syscall.h:412`)拒绝吻合，据此推测dyld未检查该错误返回即继续执行。同窗另有三条不致命拒绝：`syscall-mach 26`、`syscall-mach 28`（mach陷阱编号，本机证据无名称映射，不臆断对应例程）、`file-test-existence /opt/homebrew/.../pyenv-exec`（探针环境`PATH=/usr/bin:/bin`不含pyenv，该探查来源未定位，非崩溃因）。结论：`deny default`下syscall-unix层须一次放行dyld/libSystem启动所需的成组libc编号（Apple `mtlcompilerservice.sb`枚举约96项即此理），逐编号试错难以在有限批准次数内收敛；本轮按硬停点停止，不再追加编号重跑。
 
-新增`scripts/run_real_host.py`目前是**preflight-only**检查器，不是集成runner。必须显式提供`--allow-real-host`及`--ccr-entry`才会检查3.0.22包元数据并尝试同类固定能力探针；不执行、导入CCR入口，不联网。包元数据检查不是来源认证。即使探针返回0，仍以退出码2报告`BLOCKED integration-not-implemented`：文件/网络哨兵、监听归属、真实HTTP链与完整回收尚未实现。普通帮助可用：
+新增`scripts/run_real_host.py`目前是**preflight-only**检查器，不是集成runner。必须显式提供`--allow-real-host`及`--ccr-entry`才会检查3.1.3包元数据并尝试同类固定能力探针；不执行、导入CCR入口，不联网。包元数据检查不是来源认证。即使探针返回0，仍以退出码2报告`BLOCKED integration-not-implemented`：文件/网络哨兵、监听归属、真实HTTP链与完整回收尚未实现。普通帮助可用：
 
 ```bash
 python3 -I scripts/run_real_host.py --help
@@ -108,7 +108,7 @@ python3 -I scripts/run_real_host.py --help
 
 默认离线套件只做模拟能力结果的回归，不调用真实沙箱探针。不应把新增回归数量计为真实宿主验收，也不建议在相同环境反复重跑失败的能力探针。
 
-#### 额外源码事实（仅3.0.22）
+#### 额外源码事实（仅3.0.22，3.1.3未复审）
 
 - CLI数据根由`CCR_INTERNAL_HOME_DIR`、`CCR_INTERNAL_USER_DATA_DIR`、`CCR_INTERNAL_APP_DATA_DIR`参与确定；`CCR_CONFIG_DIR`出现在内嵌Agent middleware中，不能当作CLI隔离开关。只改HOME不足以完成隔离证明。
 - 配置优先读SQLite，无有效对象时再尝试隔离目录`config.json`及其它旧路径；JSON迁移/删除细节未核。不能只按Doctor支持的表结构猜造该版最小启动数据库。
