@@ -40,7 +40,7 @@ bash scripts/test.sh
 
 The suite uses synthetic messages and temporary configurations/databases. **No network, model calls, production configuration changes, or service restarts.**
 
-The initial candidate passed **58/58 local tests**. The current hardening pass has **80/80**: 27 plugin, 31 doctor, and 22 content-scanner tests. These local results do not establish remote CI success for this revision; check the matching commit's Actions run. The badge links to the published branch. See [verification details](docs/verification.md).
+The initial candidate passed **58/58 local tests**, and the previous hardening pass reached **80/80**. The current local suite passes **107/107**: 27 plugin, 31 doctor, 22 content-scanner, and 27 offline preflight-gate regressions. The default suite remains offline and never starts CCR or runs the real sandbox probe. These results are not real-host integration evidence and do not establish remote CI success for this revision; check the matching commit's Actions run. The badge links to the published branch. See [verification details](docs/verification.md).
 
 ### What's inside?
 
@@ -106,6 +106,8 @@ See the [configuration example](examples/plugin-config.example.json) for `plugin
 
 Before connecting it, read [compatibility and integration boundaries](docs/compatibility.md). Version 3.0.22's direct-plugin fields, permissions, module parsing, and transform return handling have now been checked in installed source; that document includes a **source-derived, not live-tested** entry shape. Actual host loading remains unverified. Partial-round handling assumes results are in the immediately following user message; histories with results spread across multiple messages are not supported.
 
+Real-host validation is **blocked; CCR has not been started**. `scripts/run_real_host.py` is **preflight-only**: explicit opt-in and an entry path permit only metadata checks and a fixed `true` sandbox probe, never CCR startup. Even a successful probe ends with `BLOCKED integration-not-implemented` and exit code 2. Three one-at-a-time approved probes exited -6/71/-11 as the policy approached a complete bootstrap set; per the hard-stop rule the probe route is paused — resuming real integration requires a separately scoped isolation mechanism and a fresh authorization scope. See the [current blocker and safety boundaries](docs/compatibility.md); no unsandboxed fallback is provided.
+
 ### Check what you will actually publish
 
 ```bash
@@ -162,7 +164,7 @@ bash scripts/test.sh
 
 测试只用合成消息与临时配置/数据库。**不联网、不调用模型、不改生产配置、不重启服务。**
 
-首版候选本地验证为 **58/58 通过**。当前加固版的本地验证为 **80/80**：插件27项、doctor31项、内容扫描22项。本地数字不代表本轮改动已通过远端CI，请核对对应提交的Actions运行结果。页首徽章链接到公开分支的结果，详见[验证记录](docs/verification.md)。
+首版候选本地验证为 **58/58 通过**，上一轮加固达到 **80/80**。当前本地套件 **107/107 通过**：插件27项、doctor31项、内容扫描22项、离线预检门禁27项。默认套件保持离线，不启动CCR，也不执行真实沙箱探针。这些结果不是实机集成证据，也不代表本轮改动已通过远端CI，请核对对应提交的Actions运行结果。页首徽章链接到公开分支的结果，详见[验证记录](docs/verification.md)。
 
 ### 里面有什么？
 
@@ -227,6 +229,8 @@ bash bin/ccr-doctor.sh --usage \
 [配置样例](examples/plugin-config.example.json) 展示 `pluginConfig` 字段，**不是完整 CCR 注册文件**。真实宿主接口未验证前，不提供猜测性的安装命令。
 
 接入前请读[兼容与接入边界](docs/compatibility.md)。已从安装源码核实3.0.22直接插件字段、权限、module解析及transform返回应用，文档附**源码推导、未实机验证**的条目结构；真实宿主加载仍未验证。部分回合处理假定结果在紧邻的下一条user消息中，结果分散在多条消息里的历史不受支持。
+
+真实宿主验证目前**阻塞，CCR尚未启动**。`scripts/run_real_host.py` **仅做预检**：明确opt-in并指定入口后，只检查元数据并执行固定`true`沙箱探针，不启动CCR。即使探针成功，仍以`BLOCKED integration-not-implemented`及退出码2结束。三次逐次批准的探针以-6/71/-11退出，策略逐步逼近完整启动集合；按硬停点规则探针路线暂停，恢复真实集成须另定隔离机制与授权范围。当前阻塞与安全边界见[兼容说明](docs/compatibility.md)；不提供无沙箱降级入口。
 
 ### 检查真正将要发布的内容
 
