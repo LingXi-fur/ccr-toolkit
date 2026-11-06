@@ -15,6 +15,8 @@
 | 检查 | 常见原因 | 下一步 |
 | --- | --- | --- |
 | `config` FAIL | 缺文件、损坏、schema不同、超大小、活跃旁文件 | 在仓库外准备安静的一致备份，核对版本/结构；不要删生产 WAL |
+
+网关运行时（CCR ≥3.0.22 实测 3.1.3）`config.sqlite` 以 WAL 模式持有常开连接，`-wal`/`-shm` 旁文件常驻属宿主正常运行状态，不是损坏；此时 doctor 按设计拒绝读取。要跑 config 检查：先 `ccr stop`（或用既有安静备份指向 `--ccr-dir`），检查完再启动——doctor 自己不做 stop/start。
 | `settings` FAIL | 非 JSON object、软链接、文件过大 | 本地核对输入，禁止直接上传原件 |
 | `env-drift` FAIL | 三处静态字段不同、重复 profile、动态 wrapper | 手动核对少数字段；工具不自动改配置 |
 | `routing` FAIL | usage schema不支持、活跃数据库或查询超预算 | 使用受支持、安静的独立备份，不裁剪原库 |
