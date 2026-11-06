@@ -12,6 +12,10 @@ jobs:
   test:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.13', '3.9']
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -19,9 +23,11 @@ jobs:
       - name: Verify preinstalled runtimes
         run: |
           node --version
-          python3 --version
           node -e 'if (Number(process.versions.node.split(".")[0]) < 20) process.exit(1)'
-          python3 -I -c 'import sys; sys.exit(sys.version_info < (3, 9))'
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: ${{ matrix.python-version }}
       - name: Synthetic offline suite
         run: bash scripts/test.sh
       - name: Committed release-content gate
